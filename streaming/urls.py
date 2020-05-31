@@ -15,9 +15,24 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-import streaming
-
+from streaming import views
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('', include('streaming.urls'))
+    # this url is for conductor showing
+    # path('/conductor/<token>', views.conductor),
+
+    # this url is for live url showing
+    # path('/live/<token>', views.conductor),
+
+    # this url is for archive showing
+    # path('/archive/<token>', views.conductor),
+
+    # users is only for admin and put , option and delete
+    # operators are available
+    # path('/users/<token>', views.conductor),
+
+    # these urls are for operating on users table
+    path('register/', views.registerNewUser),
+    # path('/lostpassword/', views.conductor),
+    # path('/logout/', views.conductor),
+
 ]

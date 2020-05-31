@@ -1,14 +1,14 @@
 from django.db import models
+from django_jalali.db import models as jmodel
+
+import jdatetime
 
 
 class User(models.Model):
-    userName = models.CharField(max_length=12, verbose_name="User Name")
+    userName = models.CharField(max_length=18, verbose_name="User Name")
     encryptedPassword = models.CharField(
         max_length=32, verbose_name="MD5 Hashed Password")
     token = models.CharField(max_length=32)
-    lastDevice = models.CharField(
-        max_length=32, verbose_name="Last Device Name")
-    lastIP = models.CharField(max_length=15, verbose_name="Last Used IP")
     fName = models.CharField(max_length=15, verbose_name="First Name")
     lName = models.CharField(max_length=15, verbose_name="Last Name")
     phone = models.CharField(max_length=11, verbose_name="Phone Number")
@@ -17,11 +17,13 @@ class User(models.Model):
         auto_now=False, auto_now_add=False, verbose_name="Birth Date", default=None)
     educationLevel = models.CharField(
         max_length=15, verbose_name="Education Level", default=None)
+    registerTime = models.DateTimeField(
+        verbose_name="Register Date and Time", auto_now=False, auto_now_add=False)
     isAdmin = models.BooleanField(
         default=False, verbose_name="Is This User Admin ?")
 
-    def __unicode__(self):
-        return (self.fName + " " + self.lName)
+    def __str__(self):
+        return (self.userName)
 
 
 class Conductor(models.Model):
