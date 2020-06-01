@@ -9,7 +9,6 @@ from django.db.models import Q
 # This method starts signup operation
 # it will check if username or phone or numberid exist in database
 # password will be MD5 hexadecimal hashed .
-# token is a unix time string that has been hashed with MD5 hexadecimal
 # birthday will be converted to garegourian date .
 
 
@@ -20,17 +19,16 @@ def signUP(informations):
         return err
 
     password = hashlib.md5(informations['password'].encode()).hexdigest()
-    token = hashlib.md5(str(time.time()).encode()).hexdigest()
     bdate = informations['birthdate'].split("/")
     bdate = jdt.datetime(int(bdate[0]), int(bdate[1]), int(bdate[2]))
     bdate = bdate.togregorian()
     now = dt.datetime.now()
-    newUser = models.User(userName=informations['username'], encryptedPassword=password, token=token,
+    newUser = models.User(userName=informations['username'], encryptedPassword=password,
                           fName=informations['fname'], lName=informations['lname'],
                           phone=informations['phone'], numberId=informations['nid'], birthDate=bdate,
                           educationLevel=informations['edlvl'], registerTime=now)
     newUser.save()
-    return {"result": True, "code": 200, "token": newUser.token}
+    return {"result": True, "code": 200}
 
 
 # this method will check if user's username , phone and number id is unique or not
@@ -69,12 +67,6 @@ def searchUserByNumberid(nid):
     return user
 
 
-# this method will search database by user's token
-def searchUserByToken(token):
-    user = models.User.objects.get(token=token)
-    return user
-
-
 def checkForLogin(username, password):
     theUser = searchUserByUsername(username)
     password = hashlib.md5(password.encode()).hexdigest()
@@ -83,7 +75,10 @@ def checkForLogin(username, password):
     theUser = theUser[0]
     if theUser.encryptedPassword != password:
         return {"result": False, "code": 631, "desc": "Password Doesnt Match"}
-    return {"result": True, "code": 200, "desc": "Login Was Success Fully", "token": theUser.token}
+    return {"result": True, "code": 200, "desc": "Login Was Success Fully", "username": theUser.userName,
+            "fname": theUser.fName, "lname": theUser.lName, "edlvl": theUser.educationLevel,
+            "birthdate": jdt.date.fromgregorian(date=theUser.birthDate).strftime("%Y/%m/%d"),
+            "registertime": jdt.date.fromgregorian(date=theUser.registerTime).strftime("%Y/%m/%d")}
 
 
 def doLogin(request):
@@ -91,8 +86,16 @@ def doLogin(request):
         result = checkForLogin(request.POST['username'], request.POST['password'])
         if result['result']:
             request.session['loggedin'] = True
-            request.session['token'] = result['token']
         return result
     else:
         result = {"result": False, "code": 400, "desc": "defective data received"}
         return result
+
+
+def getConductorItem(timeRange):
+    items = models.ConductorItem.objects.all().filter(startTime__range=timeRange).order_by("startTime")
+    itemsList = items.values()
+    for item in itemsList:
+        item['startTime'] = jdt.datetime.fromgregorian(date=item['startTime']).strftime("%Y/%m/%d - %H:%M ")
+    itemsList = list(itemsList)
+    return itemsList

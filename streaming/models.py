@@ -8,7 +8,6 @@ class User(models.Model):
     userName = models.CharField(max_length=18, verbose_name="User Name")
     encryptedPassword = models.CharField(
         max_length=32, verbose_name="MD5 Hashed Password")
-    token = models.CharField(max_length=32)
     fName = models.CharField(max_length=15, verbose_name="First Name")
     lName = models.CharField(max_length=15, verbose_name="Last Name")
     phone = models.CharField(max_length=11, verbose_name="Phone Number")
@@ -26,13 +25,13 @@ class User(models.Model):
         return (self.userName)
 
 
-class Conductor(models.Model):
+class ConductorItem(models.Model):
     ITEM_TYPE = (('Sound', 'S'), ('Video', 'V'))
     name = models.CharField(max_length=30, verbose_name="Item Name")
     desc = models.TextField(verbose_name="Description")
-    time = models.DateTimeField(
-        auto_now=False, auto_now_add=False, verbose_name="On Air Time")
-    url = models.URLField(max_length=200, verbose_name="URL")
+    startTime = models.DateTimeField(
+        auto_now=False, auto_now_add=False, verbose_name="Start Air Time")
+    duration = models.FloatField(verbose_name="Program Duration")
     itemType = models.CharField(
         max_length=1, choices=ITEM_TYPE, verbose_name="Type of This Item")
 

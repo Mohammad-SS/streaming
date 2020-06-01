@@ -34,8 +34,11 @@ urlpatterns = [
     # these urls are for operating on users table
     path('register/', views.registerNewUser),
     path('login/', views.loginUsers),
-    path('logout/', views.logOut)
+    path('logout/', views.logOut),
+    path('conductor/', views.showConductor),
     # path('/lostpassword/', views.conductor),
     # path('/logout/', views.conductor),
+
+    path('conductor/fakeit/', views.insertfake)
 
 ]
