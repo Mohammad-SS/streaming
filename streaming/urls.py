@@ -16,6 +16,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from streaming import views
+
 urlpatterns = [
     # this url is for conductor showing
     # path('/conductor/<token>', views.conductor),
@@ -32,6 +33,8 @@ urlpatterns = [
 
     # these urls are for operating on users table
     path('register/', views.registerNewUser),
+    path('login/', views.loginUsers),
+    path('logout/', views.logOut)
     # path('/lostpassword/', views.conductor),
     # path('/logout/', views.conductor),
 
