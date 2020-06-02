@@ -1,10 +1,7 @@
 from streaming import models
 import hashlib
-import time
 import jdatetime as jdt
 import datetime as dt
-from django.db.models import Q
-import json
 
 
 # This method starts signup operation
@@ -125,5 +122,54 @@ def insertToConductor(username, password, items):
             if not newItem.id:
                 return {"result": False, "code": 607, "desc": "item " + i + " is corrupted"}
         return {"result": True, "code": 608, "desc": "items inserted successfully"}
+    else:
+        return {"result": False, "code": 666, "desc": "User is not admin"}
+
+
+def getConductorItemById(itemid):
+    item = models.ConductorItem.objects.filter(id=itemid)
+    return item
+
+
+def editConductorItem(username, password, items):
+    if checkForAdmin(username, password):
+        number = 0
+        for i in items:
+            item = items[i]
+            # print(items[i]['id'])
+            db_item = getConductorItemById(item.get("id"))
+            splitedTime = item.get("time").split(":")
+            splitedDate = item.get("date").split("/")
+            date = jdt.datetime(int(splitedDate[0]), int(splitedDate[1]), int(splitedDate[2]), int(splitedTime[0]),
+                                int(splitedTime[1]))
+            date = date.togregorian()
+            updatedRows = db_item.update(startTime=date, name=item.get('name'), desc=item.get('desc'),
+                                         duration=item.get('duration'), itemType=item.get('type'))
+            number = number + updatedRows
+        if number == len(items):
+            return {"result": True, "code": 609, "desc": str(int(number)) + "items edited successfully"}
+        else:
+            return {"result": True, "code": 610,
+                    "desc": "failed to update " + str(len(items) - int(number)) + " records"}
+    else:
+        return {"result": False, "code": 666, "desc": "User is not admin"}
+
+
+def deleteConductorItem(username, password, items):
+    if checkForAdmin(username, password):
+        number = 0
+        for i in items:
+            item = items[i]
+            db_item = getConductorItemById(item.get("id"))
+            db_item.delete()
+            number = number + db_item.count()
+        if len(items) == number and not number == 0:
+            return {"result": True, "code": 611, "desc": str(int(number)) + " items deleted successfully"}
+        else:
+            if number == 0:
+                return {"result": False, "code": 613,
+                        "desc": "no data passed"}
+            return {"result": True, "code": 612,
+                    "desc": "failed to delete " + str(len(items) - int(number)) + " records"}
     else:
         return {"result": False, "code": 666, "desc": "User is not admin"}

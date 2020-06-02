@@ -35,8 +35,13 @@ urlpatterns = [
     path('register/', views.registerNewUser),
     path('login/', views.loginUsers),
     path('logout/', views.logOut),
+
+    # conductor :
     path('conductor/', views.showConductor),
     path('conductor/addNewItem/', views.addNewItemToConductor),
+    path('conductor/editThisItem/', views.editThisItem),
+    path('conductor/deleteThisItem/', views.deleteThisItem),
+
     # path('/lostpassword/', views.conductor),
     # path('/logout/', views.conductor),
 

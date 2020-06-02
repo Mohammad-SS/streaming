@@ -95,3 +95,19 @@ def insertfake(request):
         item = models.ConductorItem(name=name, desc=desc, startTime=time, duration=2, itemType=stype)
         item.save()
     return HttpResponse("DONE")
+
+@csrf_exempt
+def editThisItem(request):
+    username = request.POST['username']
+    password = request.POST['password']
+    items = json.loads(request.POST['data'])
+    jsonResponder = functions.editConductorItem(username, password, items)
+    return JsonResponse(jsonResponder, JSONEncoder, safe=False)
+
+@csrf_exempt
+def deleteThisItem(request):
+    username = request.POST['username']
+    password = request.POST['password']
+    items = json.loads(request.POST['data'])
+    jsonResponder = functions.deleteConductorItem(username, password, items)
+    return JsonResponse(jsonResponder, JSONEncoder, safe=False)
