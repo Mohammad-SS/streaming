@@ -26,7 +26,7 @@ class User(models.Model):
 
 
 class ConductorItem(models.Model):
-    ITEM_TYPE = (('Sound', 'S'), ('Video', 'V'))
+    ITEM_TYPE = (('S', 'Sound'), ('V', 'Video'))
     name = models.CharField(max_length=30, verbose_name="Item Name")
     desc = models.TextField(verbose_name="Description")
     startTime = models.DateTimeField(

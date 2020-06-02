@@ -5,6 +5,7 @@ from django.views.decorators.csrf import csrf_exempt
 from streaming import models, functions
 import jdatetime as jdt
 import datetime
+import json
 
 
 # this View will be called when /register/ url comes up . Required data for register user :
@@ -36,6 +37,7 @@ def registerNewUser(request):
         signUpRes = functions.signUP(data_received)
         if signUpRes['result']:
             request.session['loggedin'] = True
+
         jsonResponder = signUpRes
 
     # noinspection PyUnboundLocalVariable
@@ -73,6 +75,15 @@ def showConductor(request):
     timeRange = [date - datetime.timedelta(days=5), date + datetime.timedelta(days=5)]
     items = functions.getConductorItem(timeRange)
     return JsonResponse({"result": True, "code": 200, "items": items}, JSONEncoder, safe=False)
+
+
+@csrf_exempt
+def addNewItemToConductor(request):
+    username = request.POST['username']
+    password = request.POST['password']
+    items = json.loads(request.POST['data'])
+    jsonResponder = functions.insertToConductor(username, password, items)
+    return JsonResponse(jsonResponder, JSONEncoder, safe=False)
 
 
 def insertfake(request):

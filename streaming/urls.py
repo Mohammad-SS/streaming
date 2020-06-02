@@ -36,6 +36,7 @@ urlpatterns = [
     path('login/', views.loginUsers),
     path('logout/', views.logOut),
     path('conductor/', views.showConductor),
+    path('conductor/addNewItem/', views.addNewItemToConductor),
     # path('/lostpassword/', views.conductor),
     # path('/logout/', views.conductor),
 

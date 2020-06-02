@@ -4,6 +4,7 @@ import time
 import jdatetime as jdt
 import datetime as dt
 from django.db.models import Q
+import json
 
 
 # This method starts signup operation
@@ -92,6 +93,12 @@ def doLogin(request):
         return result
 
 
+def checkForAdmin(username, password):
+    password = hashlib.md5(password.encode()).hexdigest()
+    result = models.User.objects.get(userName=username, encryptedPassword=password)
+    return result.isAdmin
+
+
 def getConductorItem(timeRange):
     items = models.ConductorItem.objects.all().filter(startTime__range=timeRange).order_by("startTime")
     itemsList = items.values()
@@ -99,3 +106,24 @@ def getConductorItem(timeRange):
         item['startTime'] = jdt.datetime.fromgregorian(date=item['startTime']).strftime("%Y/%m/%d - %H:%M ")
     itemsList = list(itemsList)
     return itemsList
+
+
+def insertToConductor(username, password, items):
+    if checkForAdmin(username, password):
+        for i in items:
+            item = items[i]
+            splitedTime = item.get("time").split(":")
+            splitedDate = item.get("date").split("/")
+            print(splitedDate)
+            print(splitedTime)
+            date = jdt.datetime(int(splitedDate[0]), int(splitedDate[1]), int(splitedDate[2]), int(splitedTime[0]),
+                                int(splitedTime[1]))
+            date = date.togregorian()
+            newItem = models.ConductorItem(name=item.get("name"), desc=item.get("desc"), startTime=date,
+                                           duration=int(item.get("duration")), itemType=item.get("type"))
+            newItem.save()
+            if not newItem.id:
+                return {"result": False, "code": 607, "desc": "item " + i + " is corrupted"}
+        return {"result": True, "code": 608, "desc": "items inserted successfully"}
+    else:
+        return {"result": False, "code": 666, "desc": "User is not admin"}
