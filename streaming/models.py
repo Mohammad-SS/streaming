@@ -45,7 +45,11 @@ class Archive(models.Model):
     desc = models.TextField(verbose_name="Description")
     time = models.TimeField(
         auto_now=False, auto_now_add=False, verbose_name="On Air Time")
+    duration = models.FloatField(verbose_name="Duration of this item", default="2")
     url = models.URLField(max_length=200, verbose_name="URL", default=None)
     itemType = models.CharField(
         max_length=1, choices=ITEM_TYPE, verbose_name="Type of This Item")
     category = models.CharField(max_length=35)
+
+    def __str__(self):
+        return self.name

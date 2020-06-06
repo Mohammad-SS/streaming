@@ -94,10 +94,9 @@ def doLogin(request):
 # this method will check if this user is admin or not .
 # returns True and False .
 def checkForAdmin(username, password):
-    password = hashlib.md5(password.encode()).hexdigest()
-    print(checkForLogin(username , password))
-    if not checkForLogin(username , password)['result']:
+    if not checkForLogin(username, password)['result']:
         return False
+    password = hashlib.md5(password.encode()).hexdigest()
     result = models.User.objects.get(userName=username, encryptedPassword=password)
     return result.isAdmin
 
@@ -210,6 +209,7 @@ def getUrlTextFile():
 # it wil return standard json response
 def changeUrlTxtFile(username, password, url):
     if not checkForAdmin(username, password):
+        print(checkForAdmin(username, password))
         return {"result": False, "code": 666, "desc": "User is not admin"}
 
     module_dir = os.path.dirname(__file__)
@@ -221,3 +221,14 @@ def changeUrlTxtFile(username, password, url):
         return {"result": True, "code": 200, "desc": "url has been updated"}
     except IOError:
         return {"result": False, "code": 701, "desc": "File Not Found"}
+
+
+def getArchiveItem(cat, size, page):
+    startPoint = (int(page) - 1) * int(size)
+    endPoint = startPoint + int(size)
+    items = models.Archive.objects.filter(category=cat).order_by('id')[startPoint:endPoint]
+    itemsList = items.values()
+    for item in itemsList:
+        item['time'] = item['time'].strftime("%H:%M")
+    itemsList = list(itemsList)
+    return itemsList

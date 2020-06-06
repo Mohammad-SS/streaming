@@ -92,7 +92,7 @@ def insertfake(request):
         desc = "یک آیتم فیک الکی"
         time = datetime.datetime(2020, 6, 1 + i, 15, 0)
         stype = "V"
-        item = models.ConductorItem(name=name, desc=desc, startTime=time, duration=2, itemType=stype)
+        item = models.Archive(name=name, desc=desc, time=time.time(), duration=2, url="www.google.com" ,itemType=stype , category="Mazhabi")
         item.save()
     return HttpResponse("DONE")
 
@@ -128,3 +128,19 @@ def changeLiveUrl(request):
     url = request.POST['url']
     jsonResponder = functions.changeUrlTxtFile(username, password, url)
     return JsonResponse(jsonResponder, JSONEncoder)
+
+
+@csrf_exempt
+def showArchive(request):
+    if 'cat' not in request.POST:
+        return JsonResponse({"result": False, "code": 920, "desc": "No category received"}, JSONEncoder)
+    if 'size' not in request.POST:
+        return JsonResponse({"result": False, "code": 921, "desc": "No size received"}, JSONEncoder)
+    if 'page' not in request.POST:
+        page = 1
+    else:
+        page = request.POST['page']
+    cat = request.POST['cat']
+    size = request.POST['size']
+    items = functions.getArchiveItem(cat, size, page)
+    return JsonResponse({"result": True, "code": 200, "items": items}, JSONEncoder, safe=False)

@@ -18,18 +18,8 @@ from django.urls import path, include
 from streaming import views
 
 urlpatterns = [
-    # this url is for conductor showing
-    # path('/conductor/<token>', views.conductor),
-
-    # this url is for live url showing
-    # path('/live/<token>', views.conductor),
-
-    # this url is for archive showing
-    # path('/archive/<token>', views.conductor),
-
-    # users is only for admin and put , option and delete
-    # operators are available
-    # path('/users/<token>', views.conductor),
+    # this url is for archive showing :
+    path('archive/', views.showArchive),
 
     # these urls are for operating on users table
     path('register/', views.registerNewUser),
@@ -47,9 +37,19 @@ urlpatterns = [
     path('live/changeurl/', views.changeLiveUrl),  # needs @admin access
 
 
-    # path('/lostpassword/', views.conductor),
-    # path('/logout/', views.conductor),
 
+
+
+
+
+
+
+
+
+
+
+
+    # ///////////////////////////////////////////////
     path('conductor/fakeit/', views.insertfake)
 
 ]
