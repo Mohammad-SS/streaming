@@ -38,9 +38,14 @@ urlpatterns = [
 
     # conductor :
     path('conductor/', views.showConductor),
-    path('conductor/addNewItem/', views.addNewItemToConductor),
-    path('conductor/editThisItem/', views.editThisItem),
-    path('conductor/deleteThisItem/', views.deleteThisItem),
+    path('conductor/addNewItem/', views.addNewItemToConductor),  # needs @admin access
+    path('conductor/editThisItem/', views.editThisItem),  # needs @admin access
+    path('conductor/deleteThisItem/', views.deleteThisItem),  # needs @admin access
+
+    # live :
+    path('live/', views.showLive),
+    path('live/changeurl/', views.changeLiveUrl),  # needs @admin access
+
 
     # path('/lostpassword/', views.conductor),
     # path('/logout/', views.conductor),

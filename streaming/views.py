@@ -3,7 +3,7 @@ from django.http import HttpResponse, JsonResponse
 from json import JSONEncoder
 from django.views.decorators.csrf import csrf_exempt
 from streaming import models, functions
-import jdatetime as jdt
+import os
 import datetime
 import json
 
@@ -96,6 +96,7 @@ def insertfake(request):
         item.save()
     return HttpResponse("DONE")
 
+
 @csrf_exempt
 def editThisItem(request):
     username = request.POST['username']
@@ -104,6 +105,7 @@ def editThisItem(request):
     jsonResponder = functions.editConductorItem(username, password, items)
     return JsonResponse(jsonResponder, JSONEncoder, safe=False)
 
+
 @csrf_exempt
 def deleteThisItem(request):
     username = request.POST['username']
@@ -111,3 +113,18 @@ def deleteThisItem(request):
     items = json.loads(request.POST['data'])
     jsonResponder = functions.deleteConductorItem(username, password, items)
     return JsonResponse(jsonResponder, JSONEncoder, safe=False)
+
+
+@csrf_exempt
+def showLive(request):
+    jsonResponder = functions.getUrlTextFile()
+    return JsonResponse(jsonResponder, JSONEncoder, safe=False)
+
+
+@csrf_exempt
+def changeLiveUrl(request):
+    username = request.POST['username']
+    password = request.POST['password']
+    url = request.POST['url']
+    jsonResponder = functions.changeUrlTxtFile(username, password, url)
+    return JsonResponse(jsonResponder, JSONEncoder)

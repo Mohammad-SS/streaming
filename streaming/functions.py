@@ -2,14 +2,14 @@ from streaming import models
 import hashlib
 import jdatetime as jdt
 import datetime as dt
+import os
 
 
 # This method starts signup operation
 # it will check if username or phone or numberid exist in database
 # password will be MD5 hexadecimal hashed .
-# birthday will be converted to garegourian date .
-
-
+# birthday will be converted to gregorian date .
+# returns standard json response
 def signUP(informations):
     err = doesUserExist(informations['username'],
                         informations['phone'], informations['nid'])
@@ -30,8 +30,7 @@ def signUP(informations):
 
 
 # this method will check if user's username , phone and number id is unique or not
-
-
+# returns json error in standard type if user exist . otherwise returns None .
 def doesUserExist(username, phone, nid):
     if searchUserByUsername(username).exists():
         return {"result": False, "code": 430, "eror": "Username Exists"}
@@ -42,28 +41,28 @@ def doesUserExist(username, phone, nid):
 
 
 # this method will search database by user's username .
-
-
+# returns User
 def searchUserByUsername(username):
     user = models.User.objects.filter(userName=username)
     return user
 
 
 # this method will search database by user's phone .
-
-
+# returns User
 def searchUserByPhone(phone):
     user = models.User.objects.filter(phone=phone)
     return user
 
 
 # this method will search database by user's numberid .
-
-
+# returns User
 def searchUserByNumberid(nid):
     user = models.User.objects.filter(numberId=nid)
     return user
 
+
+# the method will check if passed data is correct or not .
+# returns JSON with standard response format
 
 def checkForLogin(username, password):
     theUser = searchUserByUsername(username)
@@ -79,6 +78,8 @@ def checkForLogin(username, password):
             "registertime": jdt.date.fromgregorian(date=theUser.registerTime).strftime("%Y/%m/%d")}
 
 
+# this method will be called whenever we need to login users . it just handle sessions and uses @checkForLogin method .
+# returns JSON with standard response format
 def doLogin(request):
     if {'username', 'password'}.issubset(request.POST):
         result = checkForLogin(request.POST['username'], request.POST['password'])
@@ -90,12 +91,19 @@ def doLogin(request):
         return result
 
 
+# this method will check if this user is admin or not .
+# returns True and False .
 def checkForAdmin(username, password):
     password = hashlib.md5(password.encode()).hexdigest()
+    print(checkForLogin(username , password))
+    if not checkForLogin(username , password)['result']:
+        return False
     result = models.User.objects.get(userName=username, encryptedPassword=password)
     return result.isAdmin
 
 
+# this method will returns conductor items within passed time range .
+# returns ConductorItem .
 def getConductorItem(timeRange):
     items = models.ConductorItem.objects.all().filter(startTime__range=timeRange).order_by("startTime")
     itemsList = items.values()
@@ -105,6 +113,9 @@ def getConductorItem(timeRange):
     return itemsList
 
 
+# this method will check if passed username and password is belong to an admin or not .
+# if belongs , it will insert passed json items .
+# returns standard json respond
 def insertToConductor(username, password, items):
     if checkForAdmin(username, password):
         for i in items:
@@ -126,11 +137,16 @@ def insertToConductor(username, password, items):
         return {"result": False, "code": 666, "desc": "User is not admin"}
 
 
+# this mehod will find conductor item by id .
+# it returns ConductorItem
 def getConductorItemById(itemid):
     item = models.ConductorItem.objects.filter(id=itemid)
     return item
 
 
+# this method will edit conductor if passed username and password belongs to an admin .
+# it will update database with passed items .
+# it returns standard json response
 def editConductorItem(username, password, items):
     if checkForAdmin(username, password):
         number = 0
@@ -155,6 +171,8 @@ def editConductorItem(username, password, items):
         return {"result": False, "code": 666, "desc": "User is not admin"}
 
 
+# this method will delete an item from conductor if passed username and password belong to an admin .
+# it returns standard json response
 def deleteConductorItem(username, password, items):
     if checkForAdmin(username, password):
         number = 0
@@ -173,3 +191,33 @@ def deleteConductorItem(username, password, items):
                     "desc": "failed to delete " + str(len(items) - int(number)) + " records"}
     else:
         return {"result": False, "code": 666, "desc": "User is not admin"}
+
+
+# this method will read the text file in streaming directory
+# returns standard json response
+def getUrlTextFile():
+    module_dir = os.path.dirname(__file__)
+    file_dir = os.path.join(module_dir, "live_url.txt")
+    try:
+        date_file = open(file_dir, 'r')
+        data = date_file.read()
+        return {"result": True, "code": 200, "url": data}
+    except IOError:
+        return {"result": False, "code": 701, "desc": "File Not Found"}
+
+
+# this method will write passed url in streaming text file if username and password belong to an admin
+# it wil return standard json response
+def changeUrlTxtFile(username, password, url):
+    if not checkForAdmin(username, password):
+        return {"result": False, "code": 666, "desc": "User is not admin"}
+
+    module_dir = os.path.dirname(__file__)
+    file_dir = os.path.join(module_dir, "live_url.txt")
+    try:
+        data_file = open(file_dir, 'w+')
+        data_file.write(url)
+        data_file.close()
+        return {"result": True, "code": 200, "desc": "url has been updated"}
+    except IOError:
+        return {"result": False, "code": 701, "desc": "File Not Found"}
