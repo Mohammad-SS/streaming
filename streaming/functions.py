@@ -131,7 +131,7 @@ def insertToConductor(username, password, items):
             newItem.save()
             if not newItem.id:
                 return {"result": False, "code": 607, "desc": "item " + i + " is corrupted"}
-        return {"result": True, "code": 608, "desc": "items inserted successfully"}
+        return {"result": True, "code": 200, "desc": "items inserted successfully"}
     else:
         return {"result": False, "code": 666, "desc": "User is not admin"}
 
@@ -140,6 +140,11 @@ def insertToConductor(username, password, items):
 # it returns ConductorItem
 def getConductorItemById(itemid):
     item = models.ConductorItem.objects.filter(id=itemid)
+    return item
+
+
+def getArchiveItemById(itemid):
+    item = models.Archive.objects.filter(id=itemid)
     return item
 
 
@@ -185,7 +190,7 @@ def deleteConductorItem(username, password, items):
         else:
             if number == 0:
                 return {"result": False, "code": 613,
-                        "desc": "no data passed"}
+                        "desc": "no delete happened"}
             return {"result": True, "code": 612,
                     "desc": "failed to delete " + str(len(items) - int(number)) + " records"}
     else:
@@ -232,3 +237,87 @@ def getArchiveItem(cat, size, page):
         item['time'] = item['time'].strftime("%H:%M")
     itemsList = list(itemsList)
     return itemsList
+
+
+def insertToArchive(username, password, items):
+    if checkForAdmin(username, password):
+        for i in items:
+            item = items[i]
+            splitedTime = item.get("time").split(":")
+            time = jdt.time(int(splitedTime[0]), int(splitedTime[1]))
+            newItem = models.Archive(name=item.get("name"), desc=item.get("desc"), time=time,
+                                     duration=int(item.get("duration")), itemType=item.get("type"),
+                                     category=item.get("category"), url=item.get("url"))
+            newItem.save()
+            if not newItem.id:
+                return {"result": False, "code": 607, "desc": "item " + i + " is corrupted"}
+        return {"result": True, "code": 200, "desc": "items inserted successfully"}
+    else:
+        return {"result": False, "code": 666, "desc": "User is not admin"}
+
+
+def editArchiveItem(username, password, items):
+    if checkForAdmin(username, password):
+        number = 0
+        for i in items:
+            item = items[i]
+            db_item = getArchiveItemById(item.get("id"))
+            splitedTime = item.get("time").split(":")
+            time = jdt.time(int(splitedTime[0]), int(splitedTime[1]))
+            updatedRows = db_item.update(name=item.get("name"), desc=item.get("desc"), time=time,
+                                         duration=int(item.get("duration")), itemType=item.get("type"),
+                                         category=item.get("category"), url=item.get("url"))
+            number = number + updatedRows
+        if number == len(items):
+            return {"result": True, "code": 609, "desc": str(int(number)) + " items edited successfully"}
+        else:
+            return {"result": True, "code": 610,
+                    "desc": "failed to update " + str(len(items) - int(number)) + " records"}
+    else:
+        return {"result": False, "code": 666, "desc": "User is not admin"}
+
+
+def deleteArchiveItem(username, password, items):
+    if checkForAdmin(username, password):
+        number = 0
+        for i in items:
+            item = items[i]
+            db_item = getArchiveItemById(item.get("id"))
+            number = number + db_item.count()
+            db_item.delete()
+        if len(items) == number and not number == 0:
+            return {"result": True, "code": 611, "desc": str(int(number)) + " items deleted successfully"}
+        else:
+            if number == 0:
+                return {"result": False, "code": 613,
+                        "desc": "no delete happened"}
+            return {"result": True, "code": 612,
+                    "desc": "failed to delete " + str(len(items) - int(number)) + " records"}
+    else:
+        return {"result": False, "code": 666, "desc": "User is not admin"}
+
+
+def createTempKey(phone):
+    user = searchUserByPhone(phone).get()
+    # send sms configurations
+    date = dt.datetime.utcnow().timestamp()
+    key = hashlib.md5(str(date).encode()).hexdigest()[1:6]
+    temp = models.Temp(user=user, key=key)
+    temp.save()
+    return True
+
+
+def updatePassword(key, newPassword):
+    newPassword = hashlib.md5(str(newPassword).encode()).hexdigest()
+    temp = models.Temp.objects.filter(key=key, done=False)
+    if temp.count() != 1:
+        print(temp.count())
+        return {"result": False, "code": 902, "desc": "Key is not Correct"}
+    temp = temp[0]
+    user = models.User.objects.filter(id=temp.user.id)
+    user = user.update(encryptedPassword=newPassword)
+    if user:
+        models.Temp.objects.filter(key=key).update(done=True)
+        return {"result": True, "code": 200, "desc": "Password has been changed"}
+    else:
+        return {"result": False, "code": 903, "desc": "could not change password"}

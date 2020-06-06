@@ -92,13 +92,14 @@ def insertfake(request):
         desc = "یک آیتم فیک الکی"
         time = datetime.datetime(2020, 6, 1 + i, 15, 0)
         stype = "V"
-        item = models.Archive(name=name, desc=desc, time=time.time(), duration=2, url="www.google.com" ,itemType=stype , category="Mazhabi")
+        item = models.Archive(name=name, desc=desc, time=time.time(), duration=2, url="www.google.com", itemType=stype,
+                              category="Mazhabi")
         item.save()
     return HttpResponse("DONE")
 
 
 @csrf_exempt
-def editThisItem(request):
+def editThisConductorItem(request):
     username = request.POST['username']
     password = request.POST['password']
     items = json.loads(request.POST['data'])
@@ -107,7 +108,7 @@ def editThisItem(request):
 
 
 @csrf_exempt
-def deleteThisItem(request):
+def deleteThisConductorItem(request):
     username = request.POST['username']
     password = request.POST['password']
     items = json.loads(request.POST['data'])
@@ -144,3 +145,49 @@ def showArchive(request):
     size = request.POST['size']
     items = functions.getArchiveItem(cat, size, page)
     return JsonResponse({"result": True, "code": 200, "items": items}, JSONEncoder, safe=False)
+
+
+@csrf_exempt
+def addNewItemToArchive(request):
+    username = request.POST['username']
+    password = request.POST['password']
+    items = json.loads(request.POST['data'])
+    jsonResponder = functions.insertToArchive(username, password, items)
+    return JsonResponse(jsonResponder, JSONEncoder, safe=False)
+
+
+@csrf_exempt
+def editThisArchiveItem(request):
+    username = request.POST['username']
+    password = request.POST['password']
+    items = json.loads(request.POST['data'])
+    jsonResponder = functions.editArchiveItem(username, password, items)
+    return JsonResponse(jsonResponder, JSONEncoder, safe=False)
+
+
+@csrf_exempt
+def deleteThisArchiveItem(request):
+    username = request.POST['username']
+    password = request.POST['password']
+    items = json.loads(request.POST['data'])
+    jsonResponder = functions.deleteArchiveItem(username, password, items)
+    return JsonResponse(jsonResponder, JSONEncoder, safe=False)
+
+
+@csrf_exempt
+def forgetPassword(request):
+    phone = request.POST['phone']
+    result = functions.createTempKey(phone)
+    if result:
+        return JsonResponse({"result": True, "code": 200, "desc": "Code has been sent successfully"}, JSONEncoder,
+                            safe=False)
+    else:
+        return JsonResponse({"result": True, "code": 909, "desc": "Could not send Code"}, JSONEncoder, safe=False)
+
+
+@csrf_exempt
+def changePassword(request):
+    key = request.POST['key']
+    newPassword = request.POST['password']
+    result = functions.updatePassword(key, newPassword)
+    return JsonResponse(result, JSONEncoder, safe=False)

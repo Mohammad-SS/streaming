@@ -18,23 +18,28 @@ from django.urls import path, include
 from streaming import views
 
 urlpatterns = [
-    # this url is for archive showing :
+    # Archive Urls :
     path('archive/', views.showArchive),
+    path('archive/addNewItem/', views.addNewItemToArchive),  # needs @admin access
+    path('archive/editThisItem/', views.editThisArchiveItem),  # needs @admin access
+    path('archive/deleteThisItem/', views.deleteThisArchiveItem),  # needs @admin access
 
-    # these urls are for operating on users table
-    path('register/', views.registerNewUser),
-    path('login/', views.loginUsers),
-    path('logout/', views.logOut),
-
-    # conductor :
+    # Users Urls :
+    path('user/register/', views.registerNewUser),
+    path('user/login/', views.loginUsers),
+    path('user/logout/', views.logOut),
+    path('user/forgetPassword/' , views.forgetPassword),
+    path('user/changePassword/', views.changePassword),
+    # Conductor Urls :
     path('conductor/', views.showConductor),
     path('conductor/addNewItem/', views.addNewItemToConductor),  # needs @admin access
-    path('conductor/editThisItem/', views.editThisItem),  # needs @admin access
-    path('conductor/deleteThisItem/', views.deleteThisItem),  # needs @admin access
+    path('conductor/editThisItem/', views.editThisConductorItem),  # needs @admin access
+    path('conductor/deleteThisItem/', views.deleteThisConductorItem),  # needs @admin access
 
-    # live :
+    # Live Urls :
     path('live/', views.showLive),
     path('live/changeurl/', views.changeLiveUrl),  # needs @admin access
+
 
 
 

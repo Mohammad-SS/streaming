@@ -53,3 +53,11 @@ class Archive(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Temp(models.Model):
+    user = models.ForeignKey("User", on_delete=models.CASCADE)
+    time = models.TimeField(auto_now_add=True)
+    key = models.CharField(max_length=20)
+    done = models.BooleanField(default=False)
+
