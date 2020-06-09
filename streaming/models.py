@@ -20,6 +20,8 @@ class User(models.Model):
         verbose_name="Register Date and Time", auto_now=False, auto_now_add=False)
     isAdmin = models.BooleanField(
         default=False, verbose_name="Is This User Admin ?")
+    banned = models.BooleanField(
+        default=False, verbose_name="Is This User Banned ?")
 
     def __str__(self):
         return (self.userName)
@@ -57,7 +59,18 @@ class Archive(models.Model):
 
 class Temp(models.Model):
     user = models.ForeignKey("User", on_delete=models.CASCADE)
-    time = models.TimeField(auto_now_add=True)
+    time = models.DateTimeField()
     key = models.CharField(max_length=20)
     done = models.BooleanField(default=False)
 
+
+class Log(models.Model):
+    time = models.TimeField(auto_now=True)
+    desc = models.TextField()
+    info = models.TextField()
+
+
+class Attachment(models.Model):
+    type = models.CharField(max_length=5)
+    uri = models.URLField()
+    user = models.ForeignKey(User , on_delete=models.CASCADE)

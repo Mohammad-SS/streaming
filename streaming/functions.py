@@ -1,8 +1,9 @@
-from streaming import models
+from streaming import models, enums
 import hashlib
 import jdatetime as jdt
 import datetime as dt
 import os
+import json
 
 
 # This method starts signup operation
@@ -11,11 +12,9 @@ import os
 # birthday will be converted to gregorian date .
 # returns standard json response
 def signUP(informations):
-    err = doesUserExist(informations['username'],
-                        informations['phone'], informations['nid'])
-    if err:
-        return err
-
+    userExist = doesUserExist(informations)
+    if userExist:
+        return userExist
     password = hashlib.md5(informations['password'].encode()).hexdigest()
     bdate = informations['birthdate'].split("/")
     bdate = jdt.datetime(int(bdate[0]), int(bdate[1]), int(bdate[2]))
@@ -25,19 +24,25 @@ def signUP(informations):
                           fName=informations['fname'], lName=informations['lname'],
                           phone=informations['phone'], numberId=informations['nid'], birthDate=bdate,
                           educationLevel=informations['edlvl'], registerTime=now)
+    # print(newUser)
     newUser.save()
+    informations['id'] = newUser.id
+    createLog("User Created Successfully", informations)
     return {"result": True, "code": 200}
 
 
 # this method will check if user's username , phone and number id is unique or not
 # returns json error in standard type if user exist . otherwise returns None .
-def doesUserExist(username, phone, nid):
-    if searchUserByUsername(username).exists():
-        return {"result": False, "code": 430, "eror": "Username Exists"}
-    if searchUserByPhone(phone).exists():
-        return {"result": False, "code": 431, "eror": "Phone Number Exists"}
-    if searchUserByNumberid(nid).exists():
-        return {"result": False, "code": 430, "eror": "Number Id exists"}
+def doesUserExist(informations):
+    if searchUserByUsername(informations['username']).exists():
+        createLog(enums.getDescription(430), informations)
+        return {"result": False, "code": 430, "error": enums.getErrors(430)}
+    if searchUserByPhone(informations['phone']).exists():
+        createLog(enums.getDescription(431), informations)
+        return {"result": False, "code": 431, "error": enums.getErrors(431)}
+    if searchUserByNumberid(informations['nid']).exists():
+        createLog(enums.getDescription(432), informations)
+        return {"result": False, "code": 432, "error": enums.getErrors(432)}
 
 
 # this method will search database by user's username .
@@ -64,15 +69,23 @@ def searchUserByNumberid(nid):
 # the method will check if passed data is correct or not .
 # returns JSON with standard response format
 
-def checkForLogin(username, password):
+def checkForLogin(username, originalPassword):
     theUser = searchUserByUsername(username)
-    password = hashlib.md5(password.encode()).hexdigest()
+    password = hashlib.md5(originalPassword.encode()).hexdigest()
     if theUser.count() != 1:
-        return {"result": False, "code": 630, "desc": "Username Doesnt Exist"}
+        createLog(enums.getDescription(630), str(theUser))
+        return {"result": False, "code": 630, "desc": enums.getErrors(630)}
     theUser = theUser[0]
+    print(theUser.encryptedPassword != password)
     if theUser.encryptedPassword != password:
-        return {"result": False, "code": 631, "desc": "Password Doesnt Match"}
-    return {"result": True, "code": 200, "desc": "Login Was Success Fully", "username": theUser.userName,
+        createLog(enums.getDescription(631), {str(theUser), originalPassword})
+        return {"result": False, "code": 631, "desc": enums.getErrors(631)}
+    if theUser.banned:
+        createLog(enums.getDescription(632), theUser)
+        return {"result": False, "code": 632, "desc": enums.getErrors(632)}
+    createLog("SuccessFully logedin", str(theUser))
+    return {"result": True, "id": theUser.id, "code": 200, "desc": "Login Was Success Fully",
+            "username": theUser.userName,
             "fname": theUser.fName, "lname": theUser.lName, "edlvl": theUser.educationLevel,
             "birthdate": jdt.date.fromgregorian(date=theUser.birthDate).strftime("%Y/%m/%d"),
             "registertime": jdt.date.fromgregorian(date=theUser.registerTime).strftime("%Y/%m/%d")}
@@ -87,7 +100,8 @@ def doLogin(request):
             request.session['loggedin'] = True
         return result
     else:
-        result = {"result": False, "code": 400, "desc": "defective data received"}
+        createLog("SuccessFully logedin", request.POST)
+        result = {"result": False, "code": 400, "desc": enums.getErrors(400)}
         return result
 
 
@@ -98,6 +112,8 @@ def checkForAdmin(username, password):
         return False
     password = hashlib.md5(password.encode()).hexdigest()
     result = models.User.objects.get(userName=username, encryptedPassword=password)
+    if not result.isAdmin:
+        createLog("User Name with this Username tried to login as admin ", username)
     return result.isAdmin
 
 
@@ -121,19 +137,21 @@ def insertToConductor(username, password, items):
             item = items[i]
             splitedTime = item.get("time").split(":")
             splitedDate = item.get("date").split("/")
-            print(splitedDate)
-            print(splitedTime)
             date = jdt.datetime(int(splitedDate[0]), int(splitedDate[1]), int(splitedDate[2]), int(splitedTime[0]),
                                 int(splitedTime[1]))
             date = date.togregorian()
             newItem = models.ConductorItem(name=item.get("name"), desc=item.get("desc"), startTime=date,
                                            duration=int(item.get("duration")), itemType=item.get("type"))
-            newItem.save()
-            if not newItem.id:
-                return {"result": False, "code": 607, "desc": "item " + i + " is corrupted"}
+            try:
+                newItem.save()
+            except Exception as e:
+                createLog("Admin failed to insert new item to conductor", {"error": e, "items": items})
+                return {"result": False, "code": 607, "desc": str(e) + enums.getErrors(607)}
+        createLog("Admin inserted items to conductor successfully", items)
         return {"result": True, "code": 200, "desc": "items inserted successfully"}
     else:
-        return {"result": False, "code": 666, "desc": "User is not admin"}
+        createLog("User with this username tried to insert items to conductor ", {"username": username, "items": items})
+        return {"result": False, "code": 666, "desc": enums.getErrors(666)}
 
 
 # this mehod will find conductor item by id .
@@ -156,7 +174,6 @@ def editConductorItem(username, password, items):
         number = 0
         for i in items:
             item = items[i]
-            # print(items[i]['id'])
             db_item = getConductorItemById(item.get("id"))
             splitedTime = item.get("time").split(":")
             splitedDate = item.get("date").split("/")
@@ -167,11 +184,15 @@ def editConductorItem(username, password, items):
                                          duration=item.get('duration'), itemType=item.get('type'))
             number = number + updatedRows
         if number == len(items):
-            return {"result": True, "code": 609, "desc": str(int(number)) + "items edited successfully"}
+            createLog("Admin edited items in conductor successfully", items)
+            return {"result": True, "code": 200, "desc": "all items updated successfully"}
         else:
-            return {"result": True, "code": 610,
-                    "desc": "failed to update " + str(len(items) - int(number)) + " records"}
+            createLog("Admin failed to update some items in conductor",
+                      {"number": str(len(items) - int(number)), "items": items})
+            return {"result": True, "code": 608,
+                    "desc": str(len(items) - int(number)) + enums.getErrors(608)}
     else:
+        createLog("User with this username tried to edit items in conductor ", {"username": username, "items": items})
         return {"result": False, "code": 666, "desc": "User is not admin"}
 
 
@@ -183,17 +204,23 @@ def deleteConductorItem(username, password, items):
         for i in items:
             item = items[i]
             db_item = getConductorItemById(item.get("id"))
-            db_item.delete()
             number = number + db_item.count()
+            db_item.delete()
         if len(items) == number and not number == 0:
-            return {"result": True, "code": 611, "desc": str(int(number)) + " items deleted successfully"}
+            createLog("Admin deleted items in conductor successfully", items)
+            return {"result": True, "code": 200, "desc": "All items deleted successfully"}
         else:
             if number == 0:
-                return {"result": False, "code": 613,
-                        "desc": "no delete happened"}
-            return {"result": True, "code": 612,
-                    "desc": "failed to delete " + str(len(items) - int(number)) + " records"}
+                createLog("Admin failed to delete items in conductor",
+                          items)
+                return {"result": False, "code": 609,
+                        "desc": enums.getErrors(609)}
+            createLog("Admin failed to delete some items in conductor",
+                      {"number": str(len(items) - int(number)), "items": items})
+            return {"result": False, "code": 610,
+                    "desc": str(len(items) - int(number)) + enums.getErrors(610)}
     else:
+        createLog("User with this username tried to delete items in conductor ", {"username": username, "items": items})
         return {"result": False, "code": 666, "desc": "User is not admin"}
 
 
@@ -206,15 +233,16 @@ def getUrlTextFile():
         date_file = open(file_dir, 'r')
         data = date_file.read()
         return {"result": True, "code": 200, "url": data}
-    except IOError:
-        return {"result": False, "code": 701, "desc": "File Not Found"}
+    except IOError as e:
+        createLog("someone tried to get live url but error occurred", {"error": e})
+        return {"result": False, "code": 701, "desc": enums.getErrors(701)}
 
 
 # this method will write passed url in streaming text file if username and password belong to an admin
 # it wil return standard json response
 def changeUrlTxtFile(username, password, url):
     if not checkForAdmin(username, password):
-        print(checkForAdmin(username, password))
+        createLog("User with this username tried to change live url", {"username": username, "url": url})
         return {"result": False, "code": 666, "desc": "User is not admin"}
 
     module_dir = os.path.dirname(__file__)
@@ -223,9 +251,11 @@ def changeUrlTxtFile(username, password, url):
         data_file = open(file_dir, 'w+')
         data_file.write(url)
         data_file.close()
+        createLog("Admin changed live url", {"username": username, "url": url})
         return {"result": True, "code": 200, "desc": "url has been updated"}
-    except IOError:
-        return {"result": False, "code": 701, "desc": "File Not Found"}
+    except IOError as e:
+        createLog("Admin tried to changed live url but error occurred", {"error": e, "url": url})
+        return {"result": False, "code": 701, "desc": enums.getErrors(701)}
 
 
 def getArchiveItem(cat, size, page):
@@ -248,12 +278,16 @@ def insertToArchive(username, password, items):
             newItem = models.Archive(name=item.get("name"), desc=item.get("desc"), time=time,
                                      duration=int(item.get("duration")), itemType=item.get("type"),
                                      category=item.get("category"), url=item.get("url"))
-            newItem.save()
-            if not newItem.id:
-                return {"result": False, "code": 607, "desc": "item " + i + " is corrupted"}
+            try:
+                newItem.save()
+            except Exception as e:
+                createLog("Admin failed to insert new item to archive", {"error": e, "items": items})
+                return {"result": False, "code": 607, "desc": str(e) + enums.getErrors(607)}
+        createLog("Admin inserted items to conductor successfully", items)
         return {"result": True, "code": 200, "desc": "items inserted successfully"}
     else:
-        return {"result": False, "code": 666, "desc": "User is not admin"}
+        createLog("User with this username tried to add items to archive ", {"username": username, "items": items})
+        return {"result": False, "code": 666, "desc": enums.getErrors(666)}
 
 
 def editArchiveItem(username, password, items):
@@ -269,11 +303,15 @@ def editArchiveItem(username, password, items):
                                          category=item.get("category"), url=item.get("url"))
             number = number + updatedRows
         if number == len(items):
-            return {"result": True, "code": 609, "desc": str(int(number)) + " items edited successfully"}
+            createLog("Admin edited items in archive successfully", items)
+            return {"result": True, "code": 200, "desc": "all items updated successfully"}
         else:
-            return {"result": True, "code": 610,
-                    "desc": "failed to update " + str(len(items) - int(number)) + " records"}
+            createLog("Admin failed to update some items in archive",
+                      {"number": str(len(items) - int(number)), "items": items})
+            return {"result": True, "code": 608,
+                    "desc": str(len(items) - int(number)) + enums.getErrors(608)}
     else:
+        createLog("User with this username tried to edit items in conductor ", {"username": username, "items": items})
         return {"result": False, "code": 666, "desc": "User is not admin"}
 
 
@@ -286,38 +324,158 @@ def deleteArchiveItem(username, password, items):
             number = number + db_item.count()
             db_item.delete()
         if len(items) == number and not number == 0:
-            return {"result": True, "code": 611, "desc": str(int(number)) + " items deleted successfully"}
+            createLog("Admin deleted items in conductor successfully", items)
+            return {"result": True, "code": 200, "desc": "All items deleted successfully"}
         else:
             if number == 0:
-                return {"result": False, "code": 613,
-                        "desc": "no delete happened"}
-            return {"result": True, "code": 612,
-                    "desc": "failed to delete " + str(len(items) - int(number)) + " records"}
+                createLog("Admin failed to delete items in archive",
+                          items)
+                return {"result": False, "code": 609,
+                        "desc": enums.getErrors(609)}
+            createLog("Admin failed to delete some items in archive",
+                      {"number": str(len(items) - int(number)), "items": items})
+            return {"result": False, "code": 610,
+                    "desc": str(len(items) - int(number)) + enums.getErrors(610)}
     else:
+        createLog("User with this username tried to delete items in archive ", {"username": username, "items": items})
         return {"result": False, "code": 666, "desc": "User is not admin"}
 
 
 def createTempKey(phone):
     user = searchUserByPhone(phone).get()
+    user.temp_set.filter().delete()
     # send sms configurations
-    date = dt.datetime.utcnow().timestamp()
-    key = hashlib.md5(str(date).encode()).hexdigest()[1:6]
-    temp = models.Temp(user=user, key=key)
+    date = dt.datetime.now()
+    key = hashlib.md5(str(date.timestamp()).encode()).hexdigest()[1:6]
+    temp = models.Temp(user=user, key=key, time=date)
     temp.save()
     return True
 
 
-def updatePassword(key, newPassword):
-    newPassword = hashlib.md5(str(newPassword).encode()).hexdigest()
+def updatePassword(key, originalNewPassword):
+    newPassword = hashlib.md5(str(originalNewPassword).encode()).hexdigest()
     temp = models.Temp.objects.filter(key=key, done=False)
     if temp.count() != 1:
-        print(temp.count())
-        return {"result": False, "code": 902, "desc": "Key is not Correct"}
+        createLog("entered key does not match with anyone", {"key": key, "newpassword": originalNewPassword})
+        return {"result": False, "code": 902, "desc": "Token is not Correct"}
     temp = temp[0]
+    passedTime = temp.time + dt.timedelta(minutes=30)
     user = models.User.objects.filter(id=temp.user.id)
-    user = user.update(encryptedPassword=newPassword)
-    if user:
+    if dt.datetime.now().time() > passedTime.time():
+        createLog("User tried to update password with an obsoleted key", {"user": user, "key": key})
         models.Temp.objects.filter(key=key).update(done=True)
+        return {"result": False, "code": 903, "desc": "Token is Expired"}
+    if user:
+        user = user.update(encryptedPassword=newPassword)
+        models.Temp.objects.filter(key=key).update(done=True)
+        createLog("user has updated his password with following key", {"user": user, "key": key})
         return {"result": True, "code": 200, "desc": "Password has been changed"}
     else:
-        return {"result": False, "code": 903, "desc": "could not change password"}
+        createLog("key found but user didnt found", {"key": key})
+        return {"result": False, "code": 904, "desc": "could not change password"}
+
+
+def changeThisUserDataByUser(request):
+    result = doLogin(request)
+    if result['result']:
+        user = models.User.objects.filter(id=result['id'])
+        data = json.loads(request.POST['data'])
+        bDate = data['birthDate'].split("/")
+        data['birthDate'] = jdt.datetime(int(bDate[0]), int(bDate[1]), int(bDate[2])).togregorian()
+        if 'phone' in data:
+            if searchUserByPhone(data['phone']).exists():
+                if searchUserByPhone(data['phone'])[0].id != user[0].id:
+                    return {"result": False, "code": 431, "error": "Phone Number Exists"}
+        if 'userName' in data:
+            if searchUserByUsername(data['userName']).exists():
+                if searchUserByUsername(data['userName'])[0].id != user[0].id:
+                    return {"result": False, "code": 430, "error": "Username Exists"}
+        if 'numberId' in data:
+            if searchUserByNumberid(data['numberId']).exists():
+                if searchUserByNumberid(data['numberId'])[0].id != user[0].id:
+                    return {"result": False, "code": 432, "error": "Number Id exists"}
+        kwargs = dict()
+        for index in data:
+            kwargs[index] = data[index]
+        number = user.update(**kwargs)
+        if number >= 0:
+            result = checkForLogin(data['userName'], request.POST['password'])
+            if result['result']:
+                request.session['loggedin'] = True
+            return {"result": True, "code": 200,
+                    "error": str(len(kwargs)) + " items of " + str(number) + " users has been changed",
+                    "loginStatus": result}
+        else:
+            return {"result": False, "code": 1001, "error": "update failed"}
+    else:
+        return result
+
+
+def changeThisUserDataByAdmin(request):
+    result = checkForAdmin(request.POST['username'], request.POST['password'])
+    if result:
+        user = models.User.objects.filter(id=request.POST['userId'])
+        # print(user)
+        # return None
+        data = json.loads(request.POST['data'])
+        bDate = data['birthDate'].split("/")
+        data['birthDate'] = jdt.datetime(int(bDate[0]), int(bDate[1]), int(bDate[2])).togregorian()
+        if 'phone' in data:
+            if searchUserByPhone(data['phone']).exists():
+                if searchUserByPhone(data['phone'])[0].id != user[0].id:
+                    return {"result": False, "code": 431, "error": "Phone Number Exists"}
+        if 'userName' in data:
+            if searchUserByUsername(data['userName']).exists():
+                if searchUserByUsername(data['userName'])[0].id != user[0].id:
+                    return {"result": False, "code": 430, "error": "Username Exists"}
+        if 'numberId' in data:
+            if searchUserByNumberid(data['numberId']).exists():
+                if searchUserByNumberid(data['numberId'])[0].id != user[0].id:
+                    return {"result": False, "code": 432, "error": "Number Id exists"}
+        kwargs = dict()
+        for index in data:
+            kwargs[index] = data[index]
+        number = user.update(**kwargs)
+        if number >= 0:
+            return {"result": True, "code": 200,
+                    "error": str(len(kwargs)) + " items of " + str(number) + " users has been changed",
+                    "loginStatus": result}
+        else:
+            return {"result": False, "code": 1001, "error": "update failed"}
+    else:
+        return result
+
+
+def createLog(desc, info):
+    # if isinstance(info, dict):
+    #     info = info.copy()
+    # if isinstance(info , models.User ):
+    # info.
+    # if "password" in info:
+    #     print(info.password)
+    #     info['password'] = "*"
+    logToDatabase(desc, info)
+    logToFile(desc, info)
+
+
+def logToDatabase(desc, info):
+    logger = models.Log(desc=desc, info=info)
+    try:
+        logger.save()
+    except Exception as e:
+        print(e)
+
+
+def logToFile(desc, info):
+    module_dir = os.path.dirname(__file__)
+    file_dir = os.path.join(module_dir, "log.txt")
+    try:
+        data_file = open(file_dir, 'a')
+    except IOError:
+        pass
+        data_file = open(file_dir, 'w+')
+    finally:
+        time = dt.datetime.now()
+        data = "\n Time : " + str(time) + " , Description : " + desc + " , Informations : " + str(info)
+        data_file.write(data)
+        data_file.close()

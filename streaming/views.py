@@ -2,8 +2,7 @@ from django.shortcuts import render, HttpResponse
 from django.http import HttpResponse, JsonResponse
 from json import JSONEncoder
 from django.views.decorators.csrf import csrf_exempt
-from streaming import models, functions
-import os
+from streaming import models, functions, enums
 import datetime
 import json
 
@@ -16,7 +15,6 @@ import json
 # numberId : @string . length <=10
 # birthDate : @date . it must be in jalali format . it will be converted to gregorian before save to db . xxxx/xx/xx
 # educationLevel : @string .length<=15
-
 @csrf_exempt
 def registerNewUser(request):
     data_received = None
@@ -37,10 +35,8 @@ def registerNewUser(request):
         signUpRes = functions.signUP(data_received)
         if signUpRes['result']:
             request.session['loggedin'] = True
-
         jsonResponder = signUpRes
 
-    # noinspection PyUnboundLocalVariable
     return JsonResponse(jsonResponder, JSONEncoder, safe=False)
 
 
@@ -48,7 +44,8 @@ def registerNewUser(request):
 def loginUsers(request):
     if 'loggedin' in request.session:
         if request.session['loggedin']:
-            jsonResponder = {"result": False, "code": 405, "desc": 'Already Loggedin'}
+            functions.createLog(enums.getDescription(405), request.POST)
+            jsonResponder = {"result": False, "code": 405, "desc": enums.getErrors(405)}
             return JsonResponse(jsonResponder, JSONEncoder, safe=False)
         else:
             return JsonResponse(functions.doLogin(request), JSONEncoder, safe=False)
@@ -191,3 +188,41 @@ def changePassword(request):
     newPassword = request.POST['password']
     result = functions.updatePassword(key, newPassword)
     return JsonResponse(result, JSONEncoder, safe=False)
+
+
+@csrf_exempt
+def changeUserDataByUser(request):
+    result = functions.changeThisUserDataByUser(request)
+    return JsonResponse(result, JSONEncoder, safe=False)
+
+
+@csrf_exempt
+def changeUserDataByAdmin(request):
+    result = functions.changeThisUserDataByAdmin(request)
+    return JsonResponse(result, JSONEncoder, safe=False)
+
+
+@csrf_exempt
+def deleteAccountByUser(request):
+    result = functions.doLogin(request)
+    print(result)
+    if result['result']:
+        user = models.User.objects.filter(id=result['id'])
+        user.delete()
+        return JsonResponse({"result": True, "desc": "Your Account Has been deleted success fully", "code": 200},
+                            JSONEncoder)
+    else:
+        return JsonResponse({"result": False, "desc": "Could not delete account", "code": 1003}, JSONEncoder)
+
+
+@csrf_exempt
+def deleteAccountByAdmin(request):
+    result = functions.checkForAdmin(request.POST['username'], request.POST['password'])
+    print(result)
+    if result:
+        user = models.User.objects.filter(id=request.POST['userId'])
+        user.delete()
+        return JsonResponse({"result": True, "desc": "This Account Has been deleted success fully", "code": 200},
+                            JSONEncoder)
+    else:
+        return JsonResponse({"result": False, "desc": "Could not delete account", "code": 1003}, JSONEncoder)
