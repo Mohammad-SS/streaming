@@ -22,6 +22,7 @@ class User(models.Model):
         default=False, verbose_name="Is This User Admin ?")
     banned = models.BooleanField(
         default=False, verbose_name="Is This User Banned ?")
+    token = models.CharField(max_length=32)
 
     def __str__(self):
         return (self.userName)
@@ -73,4 +74,4 @@ class Log(models.Model):
 class Attachment(models.Model):
     type = models.CharField(max_length=5)
     uri = models.URLField()
-    user = models.ForeignKey(User , on_delete=models.CASCADE)
+    user = models.OneToOneField("User", on_delete=models.CASCADE, related_name="avatar")

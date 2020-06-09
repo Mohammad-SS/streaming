@@ -4,6 +4,8 @@ import jdatetime as jdt
 import datetime as dt
 import os
 import json
+import string
+import random
 
 
 # This method starts signup operation
@@ -20,15 +22,16 @@ def signUP(informations):
     bdate = jdt.datetime(int(bdate[0]), int(bdate[1]), int(bdate[2]))
     bdate = bdate.togregorian()
     now = dt.datetime.now()
+    token = ''.join(random.choice(string.ascii_letters + string.digits) for i in range(32))
     newUser = models.User(userName=informations['username'], encryptedPassword=password,
                           fName=informations['fname'], lName=informations['lname'],
                           phone=informations['phone'], numberId=informations['nid'], birthDate=bdate,
-                          educationLevel=informations['edlvl'], registerTime=now)
+                          educationLevel=informations['edlvl'], registerTime=now, token=token)
     # print(newUser)
     newUser.save()
     informations['id'] = newUser.id
     createLog("User Created Successfully", informations)
-    return {"result": True, "code": 200}
+    return {"result": True, "code": 200, "token": token}
 
 
 # this method will check if user's username , phone and number id is unique or not
@@ -45,10 +48,15 @@ def doesUserExist(informations):
         return {"result": False, "code": 432, "error": enums.getErrors(432)}
 
 
+def searchUserByToken(token):
+    user = models.User.objects.filter(token=token)
+    return user
+
+
 # this method will search database by user's username .
 # returns User
 def searchUserByUsername(username):
-    user = models.User.objects.filter(userName=username)
+    user = models.User.objects.filter(userName__iexact=username)
     return user
 
 
@@ -71,12 +79,14 @@ def searchUserByNumberid(nid):
 
 def checkForLogin(username, originalPassword):
     theUser = searchUserByUsername(username)
-    password = hashlib.md5(originalPassword.encode()).hexdigest()
+    # password = hashlib.md5(originalPassword.encode()).hexdigest()
+    print(originalPassword)
+    password = originalPassword
     if theUser.count() != 1:
         createLog(enums.getDescription(630), str(theUser))
         return {"result": False, "code": 630, "desc": enums.getErrors(630)}
     theUser = theUser[0]
-    print(theUser.encryptedPassword != password)
+    # print(theUser.encryptedPassword != password)
     if theUser.encryptedPassword != password:
         createLog(enums.getDescription(631), {str(theUser), originalPassword})
         return {"result": False, "code": 631, "desc": enums.getErrors(631)}
@@ -86,7 +96,8 @@ def checkForLogin(username, originalPassword):
     createLog("SuccessFully logedin", str(theUser))
     return {"result": True, "id": theUser.id, "code": 200, "desc": "Login Was Success Fully",
             "username": theUser.userName,
-            "fname": theUser.fName, "lname": theUser.lName, "edlvl": theUser.educationLevel,
+            "fname": theUser.fName, "lname": theUser.lName, "pictureurl": theUser.avatar.uri, "token": theUser.token,
+            "edlvl": theUser.educationLevel,
             "birthdate": jdt.date.fromgregorian(date=theUser.birthDate).strftime("%Y/%m/%d"),
             "registertime": jdt.date.fromgregorian(date=theUser.registerTime).strftime("%Y/%m/%d")}
 
@@ -95,12 +106,14 @@ def checkForLogin(username, originalPassword):
 # returns JSON with standard response format
 def doLogin(request):
     if {'username', 'password'}.issubset(request.POST):
-        result = checkForLogin(request.POST['username'], request.POST['password'])
+        passwrod = hashlib.md5(request.POST['password'].encode()).hexdigest()
+        result = checkForLogin(request.POST['username'], passwrod)
         if result['result']:
             request.session['loggedin'] = True
+            request.session['token'] = result['token']
         return result
     else:
-        createLog("SuccessFully logedin", request.POST)
+        createLog("defective data received", request.POST)
         result = {"result": False, "code": 400, "desc": enums.getErrors(400)}
         return result
 
@@ -108,12 +121,13 @@ def doLogin(request):
 # this method will check if this user is admin or not .
 # returns True and False .
 def checkForAdmin(username, password):
+    print(checkForLogin(username, password))
     if not checkForLogin(username, password)['result']:
         return False
-    password = hashlib.md5(password.encode()).hexdigest()
+    # password = hashlib.md5(password.encode()).hexdigest()
     result = models.User.objects.get(userName=username, encryptedPassword=password)
     if not result.isAdmin:
-        createLog("User Name with this Username tried to login as admin ", username)
+        createLog("User Name with this Username failed to login as admin ", username)
     return result.isAdmin
 
 
@@ -147,7 +161,7 @@ def insertToConductor(username, password, items):
             except Exception as e:
                 createLog("Admin failed to insert new item to conductor", {"error": e, "items": items})
                 return {"result": False, "code": 607, "desc": str(e) + enums.getErrors(607)}
-        createLog("Admin inserted items to conductor successfully", items)
+        createLog("Admin inserted items to conductor successfully", {"items":items , "admin" : username})
         return {"result": True, "code": 200, "desc": "items inserted successfully"}
     else:
         createLog("User with this username tried to insert items to conductor ", {"username": username, "items": items})
@@ -349,6 +363,7 @@ def createTempKey(phone):
     key = hashlib.md5(str(date.timestamp()).encode()).hexdigest()[1:6]
     temp = models.Temp(user=user, key=key, time=date)
     temp.save()
+    createLog("new key generated for user", {"key": key, "user": user})
     return True
 
 
@@ -376,74 +391,100 @@ def updatePassword(key, originalNewPassword):
 
 
 def changeThisUserDataByUser(request):
-    result = doLogin(request)
-    if result['result']:
-        user = models.User.objects.filter(id=result['id'])
-        data = json.loads(request.POST['data'])
+    data = json.loads(request.POST['data'])
+    if "loggedin" and "token" in request.session:
+        operator = models.User.objects.filter(token=request.session['token'])
+        if 'userid' in request.POST:
+            user = models.User.objects.filter(id=request.POST['userid'])
+        else:
+            user = operator
+        if operator[0] != user[0] and not operator[0].isAdmin:
+            createLog("not allowed operator failed to change user data",
+                      {"data": data, "user": user, "operator": operator})
+            return {"result": False, "code": 667, "error": "you dont have permissions to edit this user data"}
         bDate = data['birthDate'].split("/")
         data['birthDate'] = jdt.datetime(int(bDate[0]), int(bDate[1]), int(bDate[2])).togregorian()
         if 'phone' in data:
             if searchUserByPhone(data['phone']).exists():
                 if searchUserByPhone(data['phone'])[0].id != user[0].id:
+                    createLog("operator tried to change user data with existing new phone number",
+                              {"data": data, "user": user, "operator": operator})
                     return {"result": False, "code": 431, "error": "Phone Number Exists"}
         if 'userName' in data:
             if searchUserByUsername(data['userName']).exists():
                 if searchUserByUsername(data['userName'])[0].id != user[0].id:
+                    createLog("operator tried to change user data with existing new username",
+                              {"data": data, "user": user, "operator": operator})
+
                     return {"result": False, "code": 430, "error": "Username Exists"}
         if 'numberId' in data:
             if searchUserByNumberid(data['numberId']).exists():
                 if searchUserByNumberid(data['numberId'])[0].id != user[0].id:
+                    createLog("operator tried to change user data with existing new numberid",
+                              {"data": data, "user": user, "operator": operator})
                     return {"result": False, "code": 432, "error": "Number Id exists"}
         kwargs = dict()
         for index in data:
             kwargs[index] = data[index]
         number = user.update(**kwargs)
         if number >= 0:
-            result = checkForLogin(data['userName'], request.POST['password'])
+            result = checkForLogin(data['userName'], user[0].encryptedPassword)
             if result['result']:
                 request.session['loggedin'] = True
+                createLog("operator changed user data succssfully", {"data": data, "user": user, "operator": operator})
             return {"result": True, "code": 200,
                     "error": str(len(kwargs)) + " items of " + str(number) + " users has been changed",
                     "loginStatus": result}
         else:
+            createLog("operator failed to update user data", {"data": data, "user": user, "operator": operator})
             return {"result": False, "code": 1001, "error": "update failed"}
     else:
-        return result
+        createLog("unauthorised user failed to change user data", {"data": data})
+        return {"result": False, "code": 667, "error": "please login first"}
 
 
 def changeThisUserDataByAdmin(request):
-    result = checkForAdmin(request.POST['username'], request.POST['password'])
-    if result:
-        user = models.User.objects.filter(id=request.POST['userId'])
-        # print(user)
-        # return None
+    if "loggedin" and "token" in request.session:
+        admin = searchUserByUsername(request.POST['username'])
+        # user = models.User.objects.filter(id=request.POST['userId'])
+        user = models.User.objects.filter(token=request.session['token'])
         data = json.loads(request.POST['data'])
         bDate = data['birthDate'].split("/")
         data['birthDate'] = jdt.datetime(int(bDate[0]), int(bDate[1]), int(bDate[2])).togregorian()
         if 'phone' in data:
             if searchUserByPhone(data['phone']).exists():
                 if searchUserByPhone(data['phone'])[0].id != user[0].id:
+                    createLog("user tried to change his data with existing new phone number",
+                              {"data": data, "user": user, "admin": admin})
                     return {"result": False, "code": 431, "error": "Phone Number Exists"}
         if 'userName' in data:
             if searchUserByUsername(data['userName']).exists():
                 if searchUserByUsername(data['userName'])[0].id != user[0].id:
+                    createLog("user tried to change his data with existing new username",
+                              {"data": data, "user": user, "admin": admin})
                     return {"result": False, "code": 430, "error": "Username Exists"}
         if 'numberId' in data:
             if searchUserByNumberid(data['numberId']).exists():
                 if searchUserByNumberid(data['numberId'])[0].id != user[0].id:
+                    createLog("user tried to change his data with existing new numberid",
+                              {"data": data, "user": user, "admin": admin})
                     return {"result": False, "code": 432, "error": "Number Id exists"}
         kwargs = dict()
         for index in data:
             kwargs[index] = data[index]
         number = user.update(**kwargs)
         if number >= 0:
+            createLog("user data has been changed by himself", {"data": data, "user": user, "admin": admin})
+
             return {"result": True, "code": 200,
                     "error": str(len(kwargs)) + " items of " + str(number) + " users has been changed",
                     "loginStatus": result}
         else:
+            createLog("user failed to update his data", {"data": data, "user": user, "admin": admin})
+
             return {"result": False, "code": 1001, "error": "update failed"}
     else:
-        return result
+        return {"result": False, "code": 667, "error": "please login first"}
 
 
 def createLog(desc, info):
